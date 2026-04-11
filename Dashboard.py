@@ -6,74 +6,110 @@ import numpy as np
 import plotly.graph_objects as go
 
 # ---------------------------------------------
-# Set Streamlit page configuration
-st.set_page_config(page_title="Loan Default Risk Predictor", layout="wide")
+# Cấu hình trang
+st.set_page_config(page_title="Dự đoán rủi ro tín dụng", layout="wide")
 # ---------------------------------------------
 
 # ---------------------------------------------
-# Load the trained dashboard model
+# Load model
 with open('xgboost_dashboard_model.pkl', 'rb') as f:
     xgb_model = pickle.load(f)
 # ---------------------------------------------
 
 # ---------------------------------------------
-# Page Title
-st.title("💼 Loan Default Risk Prediction Dashboard")
+# Tiêu đề
+st.title("💼 Hệ thống dự đoán rủi ro vỡ nợ tín dụng")
 
-# Intro Text
 st.markdown("""
-Welcome to the Loan Default Risk Predictor!
+Ứng dụng này giúp dự đoán xác suất khách hàng **không trả được nợ (default)**  
+dựa trên các thông tin tài chính quan trọng.
 
-This application assesses the probability that a loan applicant will default, based on key financial indicators.
-
-Please fill out the applicant details on the left to receive a risk evaluation.
+👉 Nhập thông tin khách hàng bên trái để xem mức độ rủi ro.
 """)
 # ---------------------------------------------
 
-# Sidebar Inputs
-st.sidebar.header("📋 Applicant Information")
+# ---------------------------------------------
+# Sidebar Input
+st.sidebar.header("📋 Thông tin khách hàng")
 
-fico_score = st.sidebar.slider("FICO Score (last_fico_range_high)", 600, 850, 700)
-log_income = st.sidebar.slider("Log(Annual Income)", 8.0, 15.0, 11.0)
-st.sidebar.caption("ℹ️ *Log(Annual Income) is the natural logarithm of annual income. Higher value = Higher income.*")
+# FICO Score
+fico_score = st.sidebar.slider(
+    "Điểm tín dụng (FICO)",
+    300, 850, 700
+)
 
-loan_amount = st.sidebar.slider("Loan Amount ($)", 500, 40000, 10000)
+# Thu nhập
+annual_income = st.sidebar.number_input(
+    "Thu nhập hàng năm ($)",
+    min_value=1000,
+    max_value=1000000,
+    value=50000,
+    step=1000
+)
 
-term = st.sidebar.selectbox("Loan Term (months)", [36, 60])
+# Loan amount
+loan_amount = st.sidebar.slider(
+    "Số tiền vay ($)",
+    500, 40000, 10000
+)
 
-dti = st.sidebar.slider("Debt-to-Income Ratio (%)", 0.0, 40.0, 15.0)
+# Term
+term = st.sidebar.selectbox(
+    "Thời gian vay (tháng)",
+    [36, 60]
+)
 
-# Feature array in correct order
-features = np.array([[fico_score, log_income, loan_amount, term, dti]])
+# DTI
+dti = st.sidebar.slider(
+    "Tỷ lệ nợ / thu nhập (%)",
+    0.0, 40.0, 15.0
+)
+
+# Interest rate
+int_rate = st.sidebar.slider(
+    "Lãi suất (%)",
+    5.0, 30.0, 12.0
+)
 
 # ---------------------------------------------
-# Predict and Display Results
-st.markdown("## 🎯 Prediction Results")
+# Tạo feature đúng thứ tự model
+features = np.array([[
+    int_rate,
+    loan_amount,
+    annual_income,
+    term,
+    dti,
+    fico_score
+]])
+# ---------------------------------------------
 
-if st.button("🔮 Predict Default Risk"):
-    probability = xgb_model.predict_proba(features)[0][1]  # Probability of default
+# ---------------------------------------------
+# Predict
+st.markdown("## 🎯 Kết quả dự đoán")
 
-    st.subheader(f"**Default Probability: {round(probability*100, 2)}%**")
+if st.button("🔮 Dự đoán rủi ro"):
 
-    # Show Risk Result
+    probability = xgb_model.predict_proba(features)[0][1]
+
+    st.subheader(f"Xác suất vỡ nợ: {round(probability * 100, 2)}%")
+
+    # Risk label
     if probability >= 0.45:
-        st.error("⚠️ High Risk of Default")
+        st.error("⚠️ Rủi ro cao (Khách hàng có khả năng vỡ nợ)")
     else:
-        st.success("✅ Low Risk of Default")
+        st.success("✅ Rủi ro thấp (Khách hàng có khả năng trả nợ tốt)")
 
     # ---------------------------------------------
-    # Gauge Meter (Speedometer)
+    # Gauge chart
     fig = go.Figure(go.Indicator(
-        mode = "gauge+number",
-        value = probability * 100,
-        domain = {'x': [0, 1], 'y': [0, 1]},
-        title = {'text': "Default Risk (%)"},
-        gauge = {
+        mode="gauge+number",
+        value=probability * 100,
+        title={'text': "Mức độ rủi ro (%)"},
+        gauge={
             'axis': {'range': [0, 100]},
-            'bar': {'color': "darkblue"},
             'steps': [
                 {'range': [0, 20], 'color': "lightgreen"},
-                {'range': [20, 40], 'color': "lime"},
+                {'range': [20, 40], 'color': "green"},
                 {'range': [40, 60], 'color': "yellow"},
                 {'range': [60, 80], 'color': "orange"},
                 {'range': [80, 100], 'color': "red"}
